@@ -10,6 +10,8 @@ from pathlib import Path
 # "next firmware update") applied to a speck of dirt, and the punch
 # reframes the dirt as construction: "load-bearing". No battery
 # cliche, no "I was tired" — the vacuum is not sorry, it has paperwork.
+# Revision 2: the entry is pinned as ASCII bytes and written as bytes,
+# with a round-trip read-back check, so the artifact is byte-exact.
 ENTRY = (
     "I mapped the spot, filed it under 'structural', and left it for "
     "the next firmware update. Some dirt is load-bearing."
@@ -24,4 +26,16 @@ if "\n" in ENTRY or "\r" in ENTRY:
 
 out = Path("/output")
 out.mkdir(parents=True, exist_ok=True)
-(out / "entry.txt").write_text(ENTRY, encoding="utf-8")
+# Pin the entry as ASCII bytes (strict: any non-ASCII fails loudly),
+# write exactly those bytes (no trailing newline), then read back and
+# verify the artifact is byte-identical to what was pinned.
+try:
+    data = ENTRY.encode("ascii")
+except UnicodeEncodeError:
+    raise SystemExit("entry is not pure ASCII")
+if len(data) < 1 or len(data) > 200:
+    raise SystemExit(f"entry is {len(data)} bytes, outside the 1-200 gate")
+target = out / "entry.txt"
+target.write_bytes(data)
+if target.read_bytes() != data:
+    raise SystemExit("round-trip check failed: entry.txt differs from pinned bytes")
